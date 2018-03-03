@@ -59,6 +59,8 @@ class ReflectionAnalyzer : private Visitor
         DECL_VISIT_PROC( UniformBufferDecl );
         DECL_VISIT_PROC( BufferDeclStmnt   );
 
+        DECL_VISIT_PROC( VarDecl           );
+
         /* --- Helper functions for code reflection --- */
 
         void ReflectSamplerValue(SamplerValue* ast, Reflection::SamplerState& samplerState);
