@@ -25,10 +25,11 @@ PreProcessor::PreProcessor(IncludeHandler& includeHandler, Log* log) :
 }
 
 std::unique_ptr<std::iostream> PreProcessor::Process(
-    const SourceCodePtr& input, const std::string& filename, bool writeLineMarks, bool enableWarnings)
+    const SourceCodePtr& input, const std::string& filename, bool writeLineMarks, bool writeLineMarkFilenames, bool enableWarnings)
 {
-    output_         = MakeUnique<std::stringstream>();
-    writeLineMarks_ = writeLineMarks;
+    output_                 = MakeUnique<std::stringstream>();
+    writeLineMarks_         = writeLineMarks;
+    writeLineMarkFilenames_ = writeLineMarkFilenames;
 
     EnableWarnings(enableWarnings);
 
@@ -96,8 +97,21 @@ void PreProcessor::ParseDirective(const std::string& directive, bool ignoreUnkno
             Warning(R_UnknownPPDirective(directive));
         else
             Error(R_UnknownPPDirective(directive), true, false);
-        ParseDirectiveTokenString();
+        IgnoreDirective();
     }
+}
+
+void PreProcessor::WriteLineDirective(unsigned int lineNo, const std::string& filename)
+{
+    if (writeLineMarkFilenames_)
+        Out() << "#line " << lineNo << " \"" << filename << '\"' << std::endl;
+    else
+        Out() << "#line " << lineNo << std::endl;
+}
+
+void PreProcessor::IgnoreDirective()
+{
+    ParseDirectiveTokenString();
 }
 
 void PreProcessor::DefineMacro(const Macro& macro)
@@ -188,6 +202,86 @@ bool PreProcessor::OnUndefineMacro(const Macro& macro)
     return true;
 }
 
+bool PreProcessor::OnSubstitueStdMacro(const Token& identTkn, TokenPtrString& tokenString)
+{
+    const auto& ident = identTkn.Spell();
+
+    if (ident == "__FILE__")
+    {
+        /* Replace '__FILE__' identifier with current filename */
+        tokenString.PushBack(Make<Token>(Tokens::StringLiteral, '\"' + GetCurrentFilename() + '\"'));
+        return true;
+    }
+    else if (ident == "__LINE__")
+    {
+        /* Replace '__LINE__' identifier with current line number */
+        tokenString.PushBack(Make<Token>(Tokens::IntLiteral, std::to_string(GetScanner().Pos().Row())));
+        return true;
+    }
+    else if (ident == "__EVAL__")
+    {
+        /* Parse and evaluate argument */
+        auto argument = ParseAndEvaluateExpr(&identTkn);
+        tokenString.PushBack(Make<Token>(Tokens::IntLiteral, std::to_string(argument.ToInt())));
+        return true;
+    }
+
+    return false;
+}
+
+Variant PreProcessor::EvaluateExpr(const TokenPtrString& tokenString, const Token* tkn)
+{
+    /* Evalutate condExpr */
+    Variant value;
+
+    PushTokenString(tokenString);
+    {
+        /* Build binary expression tree from token string */
+        auto conditionExpr = ParseExpr();
+
+        try
+        {
+            ExprEvaluator exprEvaluator;
+            value = exprEvaluator.Evaluate(*conditionExpr);
+        }
+        catch (const std::exception& e)
+        {
+            Error(e.what(), tkn);
+        }
+
+        #if 0
+        /* Check if token string has reached the end */
+        auto tokenStringIt = GetScanner().TopTokenStringIterator();
+        if (!tokenStringIt.ReachedEnd())
+            Error("illegal end of constant expression", tokenStringIt->get());
+        #endif
+    }
+    PopTokenString();
+
+    return value;
+}
+
+Variant PreProcessor::ParseAndEvaluateExpr(const Token* tkn)
+{
+    /*
+    Parse condExpr token string, and wrap it inside a bracket expression
+    to easier find the legal end of the expression during parsing.
+    TODO: this is a work around to detect an illegal end of a constant expression.
+    */
+    TokenPtrString tokenString;
+
+    tokenString.PushBack(Make<Token>(Tokens::LBracket, "("));
+    tokenString.PushBack(ParseDirectiveTokenString(true));
+    tokenString.PushBack(Make<Token>(Tokens::RBracket, ")"));
+
+    return EvaluateExpr(tokenString, tkn);
+}
+
+Variant PreProcessor::ParseAndEvaluateArgumentExpr(const Token* tkn)
+{
+    return EvaluateExpr(ParseArgumentTokenString(), tkn);
+}
+
 
 /*
  * ======= Private: =======
@@ -200,18 +294,41 @@ ScannerPtr PreProcessor::MakeScanner()
 
 void PreProcessor::PushScannerSource(const SourceCodePtr& source, const std::string& filename)
 {
+    static const std::size_t includeCounterLimit = 500;
+
+    /* Check if file has been included too often */
+    auto& counter = includeCounter_[filename];
+    if (counter >= includeCounterLimit)
+        Error(R_TooManyRecursiveIncludesOfFile(filename));
+    else
+        ++counter;
+
+    /* Push scanner for new source file */
     Parser::PushScannerSource(source, filename);
     GetScanner().Source()->NextSourceOrigin(filename, 0);
+
+    /* Write new line directive for current position */
     WritePosToLineDirective();
 }
 
 bool PreProcessor::PopScannerSource()
 {
+    /* Reduce include counter for current file */
+    const auto filename = GetCurrentFilename();
+    if (!filename.empty())
+    {
+        auto& counter = includeCounter_[filename];
+        if (counter > 0)
+            --counter;
+    }
+
+    /* Pop scanner from stack */
     if (Parser::PopScannerSource())
     {
         WritePosToLineDirective();
         return true;
     }
+
     return false;
 }
 
@@ -360,7 +477,7 @@ void PreProcessor::WritePosToLineDirective()
     if (writeLineMarks_)
     {
         auto pos = GetScanner().ActiveToken()->Pos();
-        Out() << "#line " << pos.Row() << " \"" << GetCurrentFilename() << '\"' << std::endl;
+        WriteLineDirective(pos.Row(), GetCurrentFilename());
     }
 }
 
@@ -436,23 +553,12 @@ TokenPtrString PreProcessor::ParseIdentAsTokenString()
 
     /* Parse identifier */
     auto identTkn = Accept(Tokens::Ident);
-    auto ident = identTkn->Spell();
 
     /* Check for pre-defined and dynamic macros */
-    if (ident == "__FILE__")
-    {
-        /* Replace '__FILE__' identifier with current filename */
-        tokenString.PushBack(Make<Token>(Tokens::Ident, GetCurrentFilename()));
-    }
-    else if (ident == "__LINE__")
-    {
-        /* Replace '__LINE__' identifier with current line number */
-        tokenString.PushBack(Make<Token>(Tokens::IntLiteral, std::to_string(GetScanner().Pos().Row())));
-    }
-    else
+    if (!OnSubstitueStdMacro(*identTkn, tokenString))
     {
         /* Search for defined macro */
-        auto it = macros_.find(ident);
+        auto it = macros_.find(identTkn->Spell());
         if (it != macros_.end())
         {
             /* Perform macro expansion */
@@ -794,42 +900,8 @@ void PreProcessor::ParseDirectiveIfOrElifCondition(bool isElseBranch, bool skipE
     }
     else
     {
-        /*
-        Parse condExpr token string, and wrap it inside a bracket expression
-        to easier find the legal end of the expression during parsing.
-        TODO: this is a work around to detect an illegal end of a constant expression.
-        */
-        TokenPtrString tokenString;
-        tokenString.PushBack(Make<Token>(Tokens::LBracket, "("));
-        tokenString.PushBack(ParseDirectiveTokenString(true));
-        tokenString.PushBack(Make<Token>(Tokens::RBracket, ")"));
-
-        /* Evalutate condExpr */
-        Variant condition;
-
-        PushTokenString(tokenString);
-        {
-            /* Build binary expression tree from token string */
-            auto conditionExpr = ParseExpr();
-
-            try
-            {
-                ExprEvaluator exprEvaluator;
-                condition = exprEvaluator.Evaluate(*conditionExpr);
-            }
-            catch (const std::exception& e)
-            {
-                Error(e.what(), tkn.get());
-            }
-
-            #if 0
-            /* Check if token string has reached the end */
-            auto tokenStringIt = GetScanner().TopTokenStringIterator();
-            if (!tokenStringIt.ReachedEnd())
-                Error("illegal end of constant expression", tokenStringIt->get());
-            #endif
-        }
-        PopTokenString();
+        /* Parse and evaluate conditional expression */
+        auto condition = ParseAndEvaluateExpr(tkn.get());
 
         /* Push new if-block */
         if (isElseBranch)
@@ -1118,7 +1190,7 @@ TokenPtrString PreProcessor::ParseArgumentTokenString()
     int bracketLevel = 0;
 
     /* Parse tokens until the closing bracket ')' appears */
-    while ( bracketLevel > 0 || ( !Is(Tokens::RBracket) && !Is(Tokens::Comma) ) )
+    while ( bracketLevel > 0 || !( Is(Tokens::RBracket) || Is(Tokens::Comma) ) )
     {
         /* Do not exit loop if a closing bracket ')' appears, which belongs to an inner opening bracket '(' */
         if (Is(Tokens::LBracket))

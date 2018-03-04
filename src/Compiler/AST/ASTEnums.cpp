@@ -837,6 +837,8 @@ static const std::map<BufferType, std::string> g_mapBufferType
     { BufferType::PointStream,             "PointStream"             },
     { BufferType::LineStream,              "LineStream"              },
     { BufferType::TriangleStream,          "TriangleStream"          },
+
+    { BufferType::GenericBuffer,           "buffer"                  },
 };
 
 std::string BufferTypeToString(const BufferType t)
@@ -849,7 +851,8 @@ bool IsStorageBufferType(const BufferType t)
     return
     (
         ( t >= BufferType::StructuredBuffer   && t <= BufferType::ByteAddressBuffer       ) ||
-        ( t >= BufferType::RWStructuredBuffer && t <= BufferType::ConsumeStructuredBuffer )
+        ( t >= BufferType::RWStructuredBuffer && t <= BufferType::ConsumeStructuredBuffer ) ||
+        ( t == BufferType::GenericBuffer                                                  )
     );
 }
 
@@ -1092,6 +1095,25 @@ bool IsShaderModel5AttributeType(const AttributeType t)
     return (t >= AttributeType::Domain && t <= AttributeType::PatchConstantFunc);
 }
 
+bool IsHLSLAttributeType(const AttributeType t)
+{
+    return (t >= AttributeType::Branch && t <= AttributeType::PatchConstantFunc);
+}
+
+bool IsGLSLAttributeType(const AttributeType t)
+{
+    return (t >= AttributeType::Align && t <= AttributeType::XfbStride);
+}
+
+#ifdef XSC_ENABLE_LANGUAGE_EXT
+
+bool IsExtAttributeType(const AttributeType t)
+{
+    return (t >= AttributeType::Space && t <= AttributeType::Layout);
+}
+
+#endif
+
 
 /* ----- AttributeValue Enum ----- */
 
@@ -1120,7 +1142,7 @@ bool IsAttributeValueTrianglePartitioning(const AttributeValue t)
 
 bool IsGlobalIntrinsic(const Intrinsic t)
 {
-    return (t >= Intrinsic::Abort && t <= Intrinsic::Trunc);
+    return (t >= Intrinsic::Abort && t <= Intrinsic::TexCubeProj);
 }
 
 bool IsTextureIntrinsic(const Intrinsic t)

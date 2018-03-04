@@ -15,6 +15,7 @@
 #include "ASTPrinter.h"
 
 #include "GLSLPreProcessor.h"
+#include "GLSLParser.h"
 #include "GLSLGenerator.h"
 
 #include "HLSLParser.h"
@@ -40,14 +41,16 @@ bool Compiler::CompileShader(
     Reflection::ReflectionData* reflectionData,
     StageTimePoints*            stageTimePoints)
 {
-    /* Check for supported feature */
-    if (!IsLanguageHLSL(inputDesc.shaderVersion) && !outputDesc.options.preprocessOnly)
-        return ReturnWithError(R_OnlyPreProcessingForNonHLSL);
-
     /* Make copy of output descriptor to support validation without output stream */
     std::stringstream dummyOutputStream;
 
     auto outputDescCopy = outputDesc;
+
+    if (!IsLanguageHLSL(inputDesc.shaderVersion) && !outputDesc.options.preprocessOnly)
+    {
+        Warning(R_GLSLFrontendIsIncomplete);
+        outputDescCopy.options.validateOnly = true;
+    }
 
     if (outputDescCopy.options.validateOnly)
         outputDescCopy.sourceCode = &dummyOutputStream;
@@ -154,10 +157,14 @@ bool Compiler::CompileShaderPrimary(
     else if (IsLanguageGLSL(inputDesc.shaderVersion))
         preProcessor = MakeUnique<GLSLPreProcessor>(*includeHandler, log_);
 
+    const bool writeLineMarksInPP = (!outputDesc.options.preprocessOnly || outputDesc.formatting.lineMarks);
+    const bool writeLineMarkFilenamesInPP = (!outputDesc.options.preprocessOnly || IsLanguageHLSL(inputDesc.shaderVersion));
+
     auto processedInput = preProcessor->Process(
         std::make_shared<SourceCode>(inputDesc.sourceCode),
         inputDesc.filename,
-        true,
+        writeLineMarksInPP,
+        writeLineMarkFilenamesInPP,
         ((inputDesc.warnings & Warnings::PreProcessor) != 0)
     );
 
@@ -195,6 +202,24 @@ bool Compiler::CompileShaderPrimary(
             ((inputDesc.warnings & Warnings::Syntax) != 0)
         );
     }
+    else if (IsLanguageGLSL(inputDesc.shaderVersion))
+    {
+        /* Establish intrinsic adept */
+        #if 0
+        intrinsicAdpet = MakeUnique<GLSLIntrinsicAdept>();
+        #else //!!!
+        intrinsicAdpet = MakeUnique<HLSLIntrinsicAdept>();
+        #endif
+
+        /* Parse GLSL input code */
+        GLSLParser parser(log_);
+        program = parser.ParseSource(
+            std::make_shared<SourceCode>(std::move(processedInput)),
+            outputDesc.nameMangling,
+            inputDesc.shaderVersion,
+            ((inputDesc.warnings & Warnings::Syntax) != 0)
+        );
+    }
 
     if (!program)
         return ReturnWithError(R_ParsingSourceFailed);
@@ -213,10 +238,10 @@ bool Compiler::CompileShaderPrimary(
     }
 
     /* Print AST */
-    if (outputDesc.options.showAST && log_)
+    if (outputDesc.options.showAST)
     {
         ASTPrinter printer;
-        printer.PrintAST(program.get(), *log_);
+        printer.PrintAST(program.get());
     }
 
     if (!analyzerResult)

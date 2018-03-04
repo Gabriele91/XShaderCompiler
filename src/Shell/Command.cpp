@@ -38,7 +38,7 @@ T MapStringToType(const std::string& search, const std::map<std::string, T>& map
 {
     auto it = mappingList.find(search);
     if (it == mappingList.end())
-        throw std::invalid_argument(errorMsg + " '" + search + "'");
+        throw std::invalid_argument(errorMsg);
     return it->second;
 }
 
@@ -206,8 +206,8 @@ HelpDescriptor VersionOutCommand::Help() const
         "-Vout, --version-out VERSION",
         R_CmdHelpVersionOut,
         (
-            "GLSL[110, 120, 130, 140, 150, 330, 400, 410, 420, 430, 440, 450],\n"   \
-            "ESSL[100, 300, 310, 320],\n"                                           \
+            "GLSL[110, 120, 130, 140, 150, 330, 400, 410, 420, 430, 440, 450, 460],\n"  \
+            "ESSL[100, 300, 310, 320],\n"                                               \
             "VKSL[450]"
         ),
         HelpCategory::Main
@@ -233,6 +233,7 @@ void VersionOutCommand::Run(CommandLine& cmdLine, ShellState& state)
             { "GLSL430", OutputShaderVersion::GLSL430 },
             { "GLSL440", OutputShaderVersion::GLSL440 },
             { "GLSL450", OutputShaderVersion::GLSL450 },
+            { "GLSL460", OutputShaderVersion::GLSL460 },
             { "GLSL",    OutputShaderVersion::GLSL    },
 
             { "ESSL100", OutputShaderVersion::ESSL100 },
@@ -1349,14 +1350,46 @@ HelpDescriptor DisassembleCommand::Help() const
     };
 }
 
-void DisassembleCommand::Run(CommandLine& cmdLine, ShellState& state)
+static void DisassembleCommandPrimary(CommandLine& cmdLine, ShellState& state, bool showNames)
 {
     const auto filename = cmdLine.Accept();
+
+    AssemblyDescriptor desc;
+    desc.showNames = showNames;
     
     std::ifstream file(filename, std::ios::binary);
-    DisassembleShader(file, std::cout);
+    DisassembleShader(file, std::cout, desc);
 
     state.actionPerformed = true;
+}
+
+void DisassembleCommand::Run(CommandLine& cmdLine, ShellState& state)
+{
+    DisassembleCommandPrimary(cmdLine, state, false);
+}
+
+
+/*
+ * DisassembleExtCommand class
+ */
+
+std::vector<Command::Identifier> DisassembleExtCommand::Idents() const
+{
+    return { { "-dasmx" }, { "--disassemble-ext" } };
+}
+
+HelpDescriptor DisassembleExtCommand::Help() const
+{
+    return
+    {
+        "-dasmx, --disassemble-ext FILE",
+        R_CmdHelpDisassembleExt
+    };
+}
+
+void DisassembleExtCommand::Run(CommandLine& cmdLine, ShellState& state)
+{
+    DisassembleCommandPrimary(cmdLine, state, true);
 }
 
 

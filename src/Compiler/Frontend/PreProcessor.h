@@ -46,6 +46,7 @@ class PreProcessor : public Parser
             const SourceCodePtr& input,
             const std::string& filename = "",
             bool writeLineMarks = true,
+            bool writeLineMarkFilenames = true,
             bool enableWarnings = false
         );
 
@@ -86,6 +87,12 @@ class PreProcessor : public Parser
         // Parses the specified directive, that is not part of the standard pre-processor directive (e.g. "version" or "extension" for GLSL).
         virtual void ParseDirective(const std::string& directive, bool ignoreUnknown);
 
+        // Callback function when an auto-generated '#line'-directive is to be written.
+        virtual void WriteLineDirective(unsigned int lineNo, const std::string& filename);
+
+        // Ignores the remaining tokens of the current directive.
+        void IgnoreDirective();
+
         // Defines a macro with the specified identifier, value token string, and parameters.
         void DefineMacro(const Macro& macro);
 
@@ -106,6 +113,18 @@ class PreProcessor : public Parser
 
         // Callback function when a macro is about to be undefined, return true if the undefinition is allowed.
         virtual bool OnUndefineMacro(const Macro& macro);
+
+        // Callback function when the standard macro must be substituted (e.g. __FILE__ to string literal).
+        virtual bool OnSubstitueStdMacro(const Token& identTkn, TokenPtrString& tokenString);
+
+        // Evaluate the expression of the specified token string.
+        Variant EvaluateExpr(const TokenPtrString& tokenString, const Token* tkn = nullptr);
+
+        // Parse a token string and evaluate it as expression.
+        Variant ParseAndEvaluateExpr(const Token* tkn = nullptr);
+
+        // Parse a token string as argument and evaluate it as expression.
+        Variant ParseAndEvaluateArgumentExpr(const Token* tkn = nullptr);
 
         // Returns the output stream as reference.
         inline std::stringstream& Out()
@@ -196,6 +215,7 @@ class PreProcessor : public Parser
 
         std::map<std::string, MacroPtr>     macros_;
         std::set<std::string>               onceIncluded_;
+        std::map<std::string, std::size_t>  includeCounter_; // Counter for each included file
 
         /*
         Stack to store the info which if-block in the hierarchy is active.
@@ -204,6 +224,7 @@ class PreProcessor : public Parser
         std::stack<IfBlock>                 ifBlockStack_;
 
         bool                                writeLineMarks_         = true;
+        bool                                writeLineMarkFilenames_ = true;
 
 };
 

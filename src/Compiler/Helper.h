@@ -25,6 +25,9 @@ namespace Xsc
 {
 
 
+//#define FOR_EACH_INDEX(I, C) \
+//    for (std::size_t I = 0, _N = C.size(); I < _N; ++I)
+
 // Alternative to std::make_unique for strict C++11 support.
 template <typename T, typename... Args>
 std::unique_ptr<T> MakeUnique(Args&&... args)
@@ -222,7 +225,7 @@ void ToUpper(T& s)
 /*
 Merges the source string 'src' into the destination string 'dst',
 keeps the destination characters specified by 'keepDst',
-and ignores the source characters specified by 'ignoreChar'.
+and ignores the source characters specified by 'ignoreSrc'.
 */
 template <typename T>
 void MergeString(std::basic_string<T>& dst, const std::basic_string<T>& src, const T& keepDst, const T& ignoreSrc)

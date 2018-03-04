@@ -78,7 +78,7 @@
 -T tesc -E HS -Pout "ctrl_" -o output/* TessellationTest1.hlsl
 
 [TessellationTest1 DS]
--T tese -E DS -Pin "ctrl_" -E2 PatchConstantFuncHS -o output/* TessellationTest1.hlsl
+-T tese -E DS -Pin "ctrl_" -E2 HS -o output/* TessellationTest1.hlsl
 
 [TessellationTest1 PS]
 -T frag -E PS -o output/* TessellationTest1.hlsl
@@ -152,7 +152,7 @@
 [PPTest1 VS]
 -T vert -E VS -O -o output/* PPTest1.hlsl
 
-[PPTest1 -PP]
+[PPTest1: preprocessor]
 -PP -O -o output/PPTest1.post.hlsl PPTest1.hlsl
 
 [FuncOverloadTest1 PS]
@@ -226,3 +226,9 @@
 
 [SampleCmpTest1: vert]
 -T vert -E main -Xall -o output/* SampleCmpTest1.hlsl
+
+[ReflectionTest1: comp]
+-T comp -E main --reflect -Valid -DFOO ReflectionTest1.hlsl
+
+[ESSL_IO_Semantics: comp]
+-T frag -E main -Vout ESSL -AB -o output/* ESSL_IO_Semantics.hlsl

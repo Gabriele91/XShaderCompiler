@@ -150,7 +150,7 @@ void HLSLParser::ProcessDirective(const std::string& ident)
         else if (ident == "pragma")
             ProcessDirectivePragma();
         else
-            Error(R_InvalidHLSLDirectiveAfterPP);
+            RuntimeErr(R_InvalidHLSLDirectiveAfterPP);
     }
     catch (const std::exception& e)
     {
@@ -190,7 +190,10 @@ void HLSLParser::ProcessDirectivePragma()
         {
             if (!Is(type))
                 RuntimeErr(R_UnexpectedTokenInPackMatrixPragma);
-            return Parser::AcceptIt();
+
+            // PATCH: 'this->' is required here, due to GCC bug:
+            // see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58972
+            return this->Parser::AcceptIt();
         };
 
         AcceptToken(Tokens::LBracket);
@@ -412,6 +415,7 @@ AttributePtr HLSLParser::ParseAttribute()
 
     auto ast = Make<Attribute>();
 
+    /* Parse attribute type  */
     auto attribIdent = ParseIdent();
     ast->attributeType = HLSLKeywordToAttributeType(attribIdent);
 
@@ -420,6 +424,7 @@ AttributePtr HLSLParser::ParseAttribute()
     if (ast->attributeType == AttributeType::Undefined)
         Warning(R_UnknownAttribute(attribIdent));
 
+    /* Parse optional attribute parameters */
     if (Is(Tokens::LBracket))
     {
         AcceptIt();
@@ -1485,7 +1490,7 @@ CallExprPtr HLSLParser::ParseCallExpr(const ObjectExprPtr& objectExpr, const Typ
 {
     if (objectExpr)
     {
-        /* Make new identifier token with source position form input */
+        /* Make new identifier token with source position from input */
         auto identTkn = std::make_shared<Token>(objectExpr->area.Pos(), Tokens::Ident, objectExpr->ident);
 
         /* Parse call expression and take prefix expression from input */
@@ -1775,7 +1780,7 @@ BaseTypeDenoterPtr HLSLParser::ParseBaseTypeDenoter()
     return nullptr;
 }
 
-// matrix < ScalarType, '1'-'4', '1'-'4' >;
+// vector < ScalarType, '1'-'4' >;
 BaseTypeDenoterPtr HLSLParser::ParseBaseVectorTypeDenoter()
 {
     std::string vectorType;
@@ -1864,9 +1869,19 @@ BufferTypeDenoterPtr HLSLParser::ParseBufferTypeDenoter()
     /* Parse optional template arguments */
     if (Is(Tokens::BinaryOp, "<"))
     {
-        PushParsingState({ true });
+        PushParsingState({ /*activeTemplate:*/ true });
         {
             AcceptIt();
+
+            /* Parse optional type modifier (only 'snorm' and 'unorm') */
+            if (Is(Tokens::TypeModifier))
+            {
+                //TODO: store this information inside the 'genericTypeDenoter'
+                auto modifierStr = Tkn()->Spell();
+                auto modifier = ParseTypeModifier();
+                if (modifier != TypeModifier::SNorm && modifier != TypeModifier::UNorm)
+                    Error(R_InvalidModifierForGenericTypeDen(modifierStr), true, false);
+            }
 
             /* Parse generic type denoter ('<' TYPE '>') */
             typeDenoter->genericTypeDenoter = ParseTypeDenoter(false);

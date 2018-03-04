@@ -415,7 +415,7 @@ struct ReflectionData
 {
     //! All defined macros after pre-processing.
     std::vector<std::string>            macros;
-
+    
     //! Texture bindings.
     std::vector<BindingSlot>            textures;
 
@@ -434,7 +434,7 @@ struct ReflectionData
     //! Static sampler states (identifier, states).
     std::map<std::string, SamplerState> samplerStates;
 
-    //! 'numthreads' attribute of a compute shader.
+    //! Number of local threads in a compute shader.
     NumThreads                          numThreads;
 
     //! uniform reflaction

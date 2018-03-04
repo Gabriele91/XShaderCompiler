@@ -55,6 +55,7 @@ DECL_EXTENSION( GL_ARB_separate_shader_objects                  );
 DECL_EXTENSION( GL_ARB_shading_language_420pack                 );
 DECL_EXTENSION( GL_ARB_shader_atomic_counters                   );
 DECL_EXTENSION( GL_ARB_shader_ballot                            );
+DECL_EXTENSION( GL_ARB_shader_bit_encoding                      );
 DECL_EXTENSION( GL_ARB_shader_draw_parameters                   );
 DECL_EXTENSION( GL_ARB_shader_group_vote                        );
 DECL_EXTENSION( GL_ARB_shader_image_load_store                  );

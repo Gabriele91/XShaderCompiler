@@ -477,7 +477,7 @@ IMPLEMENT_VISIT_PROC(VarDecl)
             if (typeSpecifier->isUniform)
             {
                 DataType baseType = DataType::Undefined;
-                // Add variable as uniform
+                /* Add variable as uniform */
                 Reflection::Uniform uniform;
                 uniform.ident = ast->ident;
                 uniform.type = Reflection::UniformType::Variable;
@@ -492,6 +492,7 @@ IMPLEMENT_VISIT_PROC(VarDecl)
         }
     }
 }
+
 #undef IMPLEMENT_VISIT_PROC
 
 /* --- Helper functions for code reflection --- */

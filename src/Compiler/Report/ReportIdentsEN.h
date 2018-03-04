@@ -223,6 +223,7 @@ DECL_REPORT( UnexpectedTokenInPragma,           "unexpected token in '#pragam'-d
 DECL_REPORT( UnexpectedEndOfTokenString,        "unexpected end of token string"                                                                                );
 DECL_REPORT( RemainingTokensInPragma,           "remaining unhandled tokens in '#pragma'-directive"                                                             );
 DECL_REPORT( EmptyPragma,                       "empty '#pragma'-directive"                                                                                     );
+DECL_REPORT( TooManyRecursiveIncludesOfFile,    "too many recursive includes of file[: \"{0}\"]"                                                                          );
 
 /* ----- VisitorTracker ----- */
 
@@ -344,11 +345,20 @@ DECL_REPORT( MacrosWithTwoUnderscoresReserved,  "macros containing consecutive u
 DECL_REPORT( IllegalRedefOfStdMacro,            "illegal redefinition of standard macro[: {0}]"                                                                 );
 DECL_REPORT( IllegalUndefOfStdMacro,            "illegal undefinition of standard macro[: {0}]"                                                                 );
 DECL_REPORT( VersionMustBeFirstDirective,       "'#version'-directive must be the first directive"                                                              );
+DECL_REPORT( GLSLVersionAlreadyDefined,         "GLSL version is already defined[ (with number {0})]"                                                           );
 DECL_REPORT( UnknownGLSLVersion,                "unknown GLSL version: '{0}'"                                                                                   );
+DECL_REPORT( UnknownESSLVersion,                "unknown ESSL version: '{0}'"                                                                                   );
 DECL_REPORT( NoProfileForGLSLVersionBefore150,  "versions before 150 do not allow a profile token"                                                              );
-DECL_REPORT( InvalidGLSLVersionProfile,         "invalid version profile '{0}' (must be 'core' or 'compatibility')"                                             );
+DECL_REPORT( InvalidGLSLVersionProfile,         "invalid version profile '{0}' (must be 'core', 'compatibility', or 'es')"                                      );
 DECL_REPORT( ExtensionNotSupported,             "extension not supported[: {0}]"                                                                                );
 DECL_REPORT( InvalidGLSLExtensionBehavior,      "invalid extension behavior '{0}' (must be 'enable', 'require', 'warn', or 'disable')"                          );
+
+/* ----- GLSLParser ----- */
+
+DECL_REPORT( InvalidGLSLDirectiveAfterPP,       "only '#line', '#version', and '#extension' directives are allowed after pre-processing"                        );
+DECL_REPORT( IllegalInheritance,                "illegal inheritance"                                                                                           );
+DECL_REPORT( UnknownLayoutQualifier,            "unknown layout qualifier: '{0}'"                                                                               );
+DECL_REPORT( OnlyFieldsAllowedInUniformBlock,   "only field declarations are allowed in a uniform block"                                                        );
 
 /* ----- GLSLKeywords ----- */
 
@@ -384,8 +394,9 @@ DECL_REPORT( UnexpectedTokenInPackMatrixPragma, "unexpected token in '#pragma pa
 DECL_REPORT( UnexpectedPreParsedAST,            "unexpected pre-parsed AST node"                                                                                );
 DECL_REPORT( InvalidHLSLDirectiveAfterPP,       "only '#line' and '#pragma' directives are allowed after pre-processing"                                        );
 DECL_REPORT( InvalidHLSLPragmaAfterPP,          "only 'pack_matrix' pragma directive is allowed after pre-processing"                                           );
-DECL_REPORT( IllegalRecursiveInheritance,       "recursive inheritance is not allowed"                                                                          );
-DECL_REPORT( IllegalMultipleInheritance,        "multiple inheritance is not allowed"                                                                           );
+DECL_REPORT( InvalidModifierForGenericTypeDen,  "invalid modifier for generic type denoter[: '{0}']"                                                            );
+DECL_REPORT( IllegalRecursiveInheritance,       "illegal recursive inheritance"                                                                                 );
+DECL_REPORT( IllegalMultipleInheritance,        "illegal multiple inheritance"                                                                                  );
 DECL_REPORT( IllegalDeclStmntInsideDeclOf,      "illegal declaration statement inside declaration of '{0}'"                                                     );
 DECL_REPORT( IllegalBufferTypeGenericSize,      "illegal usage of generic size in texture, buffer, or stream object"                                            );
 DECL_REPORT( IllegalPackOffset,                 "packoffset is only allowed in a constant buffer"                                                               );
@@ -501,7 +512,7 @@ DECL_REPORT( PreProcessingSourceFailed,         "preprocessing input code failed
 DECL_REPORT( ParsingSourceFailed,               "parsing input code failed"                                                                                     );
 DECL_REPORT( AnalyzingSourceFailed,             "analyzing input code failed"                                                                                   );
 DECL_REPORT( GeneratingOutputCodeFailed,        "generating output code failed"                                                                                 );
-DECL_REPORT( OnlyPreProcessingForNonHLSL,       "only pre-processing supported for shaders other than HLSL or Cg"                                               );
+DECL_REPORT( GLSLFrontendIsIncomplete,          "GLSL frontend is incomplete"                                                                                   );
 DECL_REPORT( InvalidILForDisassembling,         "invalid intermediate language for disassembling"                                                               );
 DECL_REPORT( NotBuildWithSPIRV,                 "compiler was not build with SPIR-V"                                                                            );
 
@@ -513,6 +524,7 @@ DECL_REPORT( MissingValueInShellCmd,            "missing value in command '{0}'"
 DECL_REPORT( PressAnyKeyToContinue,             "press any key to continue ..."                                                                                 );
 DECL_REPORT( FailedToReadFile,                  "failed to read file: \"{0}\""                                                                                  );
 DECL_REPORT( FailedToWriteFile,                 "failed to write file: \"{0}\""                                                                                 );
+DECL_REPORT( FailedToIncludeFile,               "failed to include file: \"{0}\""                                                                               );
 DECL_REPORT( ValidateShader,                    "validate \"{0}\""                                                                                              );
 DECL_REPORT( ValidationSuccessful,              "validation successful"                                                                                         );
 DECL_REPORT( ValidationFailed,                  "validation failed"                                                                                             );
@@ -573,7 +585,7 @@ DECL_REPORT( CmdHelpDetailsFormatting,          "blanks        => blank lines be
                                                 "line-marks    => line marks (e.g. '#line 30'); default={0}\n"      \
                                                 "line-sep      => separate lines in columns; default={1}\n"         \
                                                 "newline-scope => write open braces at new lines; default={1}"                                                  );
-DECL_REPORT( CmdHelpIndent,                     "Code indentation string (use '\\t' for tabs); default='    '"                                                  );
+DECL_REPORT( CmdHelpIndent,                     "Code indentation string (use '\\\\t' for tabs); default='    '"                                                );
 DECL_REPORT( CmdHelpPrefix,                     "Prefix for the specified name-mangling type; valid types:"                                                     );
 DECL_REPORT( CmdHelpDetailsPrefix,              "in        => input variables; default='xsv_'\n"    \
                                                 "namespace => namespace objects; default='xsn_'\n"  \
@@ -586,6 +598,7 @@ DECL_REPORT( CmdHelpDetailsNameMangling,        "buffer-fields   => rename 'buff
 DECL_REPORT( CmdHelpSeparateShaders,            "Ensures compatibility to 'ARB_separate_shader_objects' extension; default={0}"                                 );
 DECL_REPORT( CmdHelpSeparateSamplers,           "Enables/disables generation of separate sampler state objects; default={0}"                                    );
 DECL_REPORT( CmdHelpDisassemble,                "Disassembles the SPIR-V module"                                                                                );
+DECL_REPORT( CmdHelpDisassembleExt,             "Disassembles the SPIR-V module with extended ID numbers"                                                       );
 DECL_REPORT( InvalidShaderTarget,               "invalid shader target[: '{0}']"                                                                                );
 DECL_REPORT( InvalidShaderVersionIn,            "invalid input shader version[: '{0}']"                                                                         );
 DECL_REPORT( InvalidShaderVersionOut,           "invalid output shader version[: '{0}']"                                                                        );
